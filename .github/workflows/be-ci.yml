@@ -37,6 +37,6 @@ jobs:  # 실행할 작업을 정의합니다.
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}  # ECR 레지스트리 URL 설정
           IMAGE_TAG: ${{ github.sha }}  # GitHub의 커밋 SHA 값을 이미지 태그로 사용
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f ./server/Dockerfile.prod ./server  # 지정된 Dockerfile을 사용하여 이미지를 빌드하고 태그 지정
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f .Dockerfile .  # 지정된 Dockerfile을 사용하여 이미지를 빌드하고 태그 지정
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG  # 빌드된 이미지를 ECR에 푸시
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"  # 빌드된 이미지 URL을 워크플로우 출력으로 설정
