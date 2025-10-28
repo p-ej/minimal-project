@@ -22,7 +22,7 @@ jobs:  # 실행할 작업을 정의합니다.
  
     steps:  # 이 작업에서 실행될 단계들을 정의합니다.
       - name: Checkout  # 소스 코드를 체크아웃하는 단계
-        uses: actions/checkout@v3  # GitHub 제공 체크아웃 액션 사용
+        uses: actions/checkout@v4  # GitHub 제공 체크아웃 액션 사용
  
       - name: Config AWS credentials  # AWS 자격 증명을 구성하는 단계
         uses: aws-actions/configure-aws-credentials@v2  # AWS 자격 증명 구성 액션 사용
@@ -33,7 +33,7 @@ jobs:  # 실행할 작업을 정의합니다.
  
       - name: Login To Amazon ECR  # Amazon ECR에 로그인하는 단계
         id: login-ecr  # 이 단계의 ID를 'login-ecr'로 설정 (후속 단계에서 참조 가능)
-        uses: aws-actions/amazon-ecr-login@v1  # Amazon ECR 로그인 액션 사용
+        uses: aws-actions/amazon-ecr-login@v2  # Amazon ECR 로그인 액션 사용
  
       - name: Build, tag, and push image to Amazon ECR  # Docker 이미지를 빌드, 태그, ECR에 푸시하는 단계
         id: build-image  # 이 단계의 ID를 'build-image'로 설정
@@ -41,9 +41,10 @@ jobs:  # 실행할 작업을 정의합니다.
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}  # ECR 레지스트리 URL 설정
           IMAGE_TAG: ${{ github.sha }}  # GitHub의 커밋 SHA 값을 이미지 태그로 사용
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .  # 지정된 Dockerfile을 사용하여 이미지를 빌드하고 태그 지정
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG  # 빌드된 이미지를 ECR에 푸시
-          echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"  # 빌드된 이미지 URL을 워크플로우 출력으로 설정
+          IMAGE_URI=$ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}
+          docker build -t ${IMAGE_URI} -f Dockerfile .
+          docker push ${IMAGE_URI}
+          echo "IMAGE_URI=${IMAGE_URI}" >> $GITHUB_ENV
         
        # 여기서 새 이미지 URI를 태스크 정의에 주입
       - name: Render task definition
