@@ -1,0 +1,17 @@
+{
+  "family": "minimal-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1",
+  "memory": "3072",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/ecsAppTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "REPLACE_IMAGE_URI",
+      "portMappings": [{ "containerPort": 80, "protocol": "tcp" }],
+      "essential": true
+    }
+  ]
+}

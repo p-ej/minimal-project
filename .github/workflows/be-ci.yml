@@ -8,7 +8,11 @@ on:
  
 env:  # 공통 환경 변수를 설정합니다.
   AWS_REGION: ap-northeast-2  # AWS 리전을 서울 리전으로 설정
-  ECR_REPOSITORY: minimal-project  # ECR 저장소 이름을 'study-log'로 설정
+  ECR_REPOSITORY: minimal-project  # ECR 저장소 이름을 'minimal-project'로 설정
+  IMAGE_TAG: ${{ github.sha }}
+  ECS_CLUSTER: cluster-nestjs-second                       # <- 실제 값으로
+  ECS_SERVICE: role-nestjs-second-service-d85kzfam         # <- 실제 값으로
+
  
 jobs:  # 실행할 작업을 정의합니다.
   deploy:  # 'deploy'라는 작업을 정의합니다.
@@ -40,3 +44,21 @@ jobs:  # 실행할 작업을 정의합니다.
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile .  # 지정된 Dockerfile을 사용하여 이미지를 빌드하고 태그 지정
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG  # 빌드된 이미지를 ECR에 푸시
           echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"  # 빌드된 이미지 URL을 워크플로우 출력으로 설정
+        
+       # 여기서 새 이미지 URI를 태스크 정의에 주입
+      - name: Render task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ecs-task-def.json
+          container-name: app
+          image: ${{ env.IMAGE_URI }}
+
+      # 그리고 ECS 서비스에 새 태스크 정의로 배포
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
