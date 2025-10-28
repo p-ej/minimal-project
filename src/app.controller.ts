@@ -12,6 +12,6 @@ export class AppController {
 
   @Get('/test')
   getTest(): string {
-    return 'test Request';
+    return 'Jingjing TEST';
   }
 }
