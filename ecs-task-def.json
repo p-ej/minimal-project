@@ -10,7 +10,7 @@
     {
       "name": "app",
       "image": "REPLACE_IMAGE_URI",
-      "portMappings": [{ "containerPort": 80, "protocol": "tcp" }],
+      "portMappings": [{ "containerPort": 3000, "protocol": "tcp" }],
       "essential": true
     }
   ]
