@@ -1,5 +1,5 @@
 {
-  "family": "minimal-task",
+  "family": "role-nestjs-second",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "1024",
