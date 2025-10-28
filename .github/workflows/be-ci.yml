@@ -8,7 +8,7 @@ on:
  
 env:  # 공통 환경 변수를 설정합니다.
   AWS_REGION: ap-northeast-2  # AWS 리전을 서울 리전으로 설정
-  ECR_REPOSITORY: nestjs/minimal-proejct  # ECR 저장소 이름을 'study-log'로 설정
+  ECR_REPOSITORY: minimal-project  # ECR 저장소 이름을 'study-log'로 설정
  
 jobs:  # 실행할 작업을 정의합니다.
   deploy:  # 'deploy'라는 작업을 정의합니다.
