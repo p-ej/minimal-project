@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Test } from './test/test.entitiy';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
+import { CreateTestDto } from './dtos/create-test.dto';
 
 @Injectable()
 export class AppService {
@@ -10,8 +11,8 @@ export class AppService {
     private readonly testRepo: Repository<Test>,
   ) {}
 
-  async create(name: string, description?: string) {
-    const newTest = this.testRepo.create({ name, description });
+  async create(dto: CreateTestDto) {
+    const newTest = this.testRepo.create({ ...dto });
     return await this.testRepo.save(newTest);
   }
 
