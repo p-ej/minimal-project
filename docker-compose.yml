@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mariadb:11
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: appdb
+      MARIADB_USER: appuser
+      MARIADB_PASSWORD: apppass
+      TZ: Asia/Seoul
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      # 루트로 실제 쿼리 수행 (비밀번호 이스케이프 $$)
+      test: ["CMD-SHELL", "mariadb -h 127.0.0.1 -uroot -p$${MARIADB_ROOT_PASSWORD} -e 'SELECT 1' || exit 1"]
+      start_period: 90s     # 초기화 여유 넉넉히
+      interval: 5s
+      timeout: 5s
+      retries: 30           # 최대 ~150초 기다림
+
+  app:
+    build: .
+    container_name: nest-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: appdb
+      DB_USER: appuser
+      DB_PASS: apppass
+      NODE_ENV: development
+    working_dir: /var/app           # ⬅️ Dockerfile의 WORKDIR와 일치
+    volumes:
+      - .:/var/app                  # ⬅️ 경로 맞춤 (Dockerfile과 동일)
+      - /var/app/node_modules       # 컨테이너 전용 node_modules
+    command: sh -lc "npm ci && npm run start:dev"
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:
