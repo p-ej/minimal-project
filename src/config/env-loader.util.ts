@@ -29,22 +29,49 @@ export async function loadEnvironmentVariables(): Promise<void> {
     const awsRegion = process.env.AWS_REGION || 'ap-northeast-2';
 
     try {
-      // Parameter Store에서 파라미터 가져오기
+      // 1) 경로 기반으로 시도 (개별 파라미터들)
       const parameters = AWSParamStore.getParametersByPathSync(paramStorePath, {
         region: awsRegion,
         recursive: true,
       }) as Array<{ Name: string; Value: string; Type?: string }>;
 
-      // 파라미터를 환경변수로 설정
-      if (parameters && Array.isArray(parameters)) {
+      if (parameters && Array.isArray(parameters) && parameters.length > 0) {
+        // 개별 파라미터들을 환경변수로 설정
         parameters.forEach((param) => {
-          // 파라미터 이름에서 경로 제거 후 변수명 추출
-          // 예: /prod/minimal-project/DB_HOST -> DB_HOST
           const paramName = param.Name.split('/').pop();
           if (paramName && param.Value) {
             process.env[paramName] = param.Value;
             paramStoreValues[paramName] = param.Value;
           }
+        });
+      } else {
+        // 2) 단일 JSON 파라미터로 시도
+        const jsonParamKey = process.env.PARAM_STORE_JSON_KEY || paramStorePath;
+        const singleParam = AWSParamStore.getParameterSync(jsonParamKey, {
+          region: awsRegion,
+          withDecryption: true,
+        }) as { Name: string; Value: string } | null;
+
+        if (!singleParam || !singleParam.Value) {
+          throw new Error(
+            `No parameters found at path '${paramStorePath}' and JSON parameter '${jsonParamKey}' is empty or missing`,
+          );
+        }
+
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = JSON.parse(singleParam.Value);
+        } catch (e) {
+          throw new Error(
+            `JSON parameter '${jsonParamKey}' has invalid JSON: ${(e as Error).message}`,
+          );
+        }
+
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (value === undefined || value === null) return;
+          const stringValue = String(value);
+          process.env[key] = stringValue;
+          paramStoreValues[key] = stringValue;
         });
       }
 

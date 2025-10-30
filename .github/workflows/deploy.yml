@@ -49,15 +49,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci                      # CI 통과 후에만 CD 진행
     # Access Key 방식은 OIDC 권한이 필요 없습니다. (id-token 제거)
-    permissions:
-      contents: read
+    # permissions:
+      # contents: read
 
     env:
       AWS_REGION: ap-northeast-2              # 배포 리전
       ECR_REPOSITORY: minimal-project         # ECR 리포지토리 이름 (사전 생성 필요)
       IMAGE_TAG: ${{ github.sha }}            # 이미지 태그(커밋 SHA 사용)
       ECS_CLUSTER: cluster-nestjs-second      # 이전 be-ci.yml 기준 실제 ECS 클러스터명
-      ECS_SERVICE: role-nestjs-second-service-d85kzfam  # 이전 be-ci.yml 기준 실제 ECS 서비스명
+      ECS_SERVICE: role-nestjs-second-service  # 이전 be-ci.yml 기준 실제 ECS 서비스명
 
     steps:
       # 1) 저장소 체크아웃 (도커 컨텍스트로 사용)
