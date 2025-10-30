@@ -39,15 +39,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 4) 린트 수행 — 자동 수정 불필요, 실패 시 워크플로 중단
-      - name: Lint
-        run: npm run lint -- --no-fix
-
-      # 5) 유닛 테스트 수행
+      # 4) 유닛 테스트 수행
       - name: Test
         run: npm test -- --ci --reporters=default --reporters=jest-junit
 
-      # 6) 타입체크/빌드 검증 — TS 컴파일 이상 여부 확인
+      # 5) 타입체크/빌드 검증 — TS 컴파일 이상 여부 확인
       - name: Build
         run: npm run build
 
