@@ -21,7 +21,8 @@ export async function loadEnvironmentVariables(): Promise<void> {
     );
 
     const paramStorePath =
-      process.env.PARAM_STORE_PATH || `/prod/${process.env.APP_NAME || 'minimal-project'}`;
+      process.env.PARAM_STORE_PATH ||
+      `/prod/${process.env.APP_NAME || 'minimal-project'}`;
     const awsRegion = process.env.AWS_REGION || 'ap-northeast-2';
 
     try {

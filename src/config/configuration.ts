@@ -31,4 +31,3 @@ export default () => ({
       `/prod/${process.env.APP_NAME || 'minimal-project'}`,
   },
 });
-
