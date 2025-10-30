@@ -11,8 +11,22 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# OS
+# Environment variables (민감 정보 포함)
+.env
+.env.*
+!.env.example
+!.env.template
+
+# OS files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
 
 # Tests
 /coverage
@@ -33,3 +47,30 @@ lerna-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# AWS / Cloud credentials
+*.pem
+*.key
+.aws/
+aws-exports.js
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.tsbuildinfo
+.build/
+
+# Package manager lock files (선택사항 - 프로젝트 정책에 따라)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
