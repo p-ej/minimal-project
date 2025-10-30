@@ -62,7 +62,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) AWS 자격증명 구성 (Access Key 방식). 레포 시크릿에 키 보관 필요
+      # 2) Buildx 설정 (docker-container 드라이버) — GHA 캐시 사용을 위해 필요
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          install: true
+          driver: docker-container
+
+      # 3) AWS 자격증명 구성 (Access Key 방식). 레포 시크릿에 키 보관 필요
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -70,16 +77,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      # 3) ECR 로그인 — docker/build-push-action이 ECR에 푸시할 수 있도록 레지스트리 로그인
+      # 4) ECR 로그인 — docker/build-push-action이 ECR에 푸시할 수 있도록 레지스트리 로그인
       - name: Login to Amazon ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4) 이미지 URI 구성 — 이후 단계에서 참조하기 쉽도록 환경변수에 저장
+      # 5) 이미지 URI 구성 — 이후 단계에서 참조하기 쉽도록 환경변수에 저장
       - name: Set image uri
         run: echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
 
-      # 5) 도커 이미지 빌드 및 푸시 — GHA 캐시를 사용해 레이어 캐시 적중률 향상, 배포 시간 단축
+      # 6) 도커 이미지 빌드 및 푸시 — GHA 캐시를 사용해 레이어 캐시 적중률 향상, 배포 시간 단축
       - name: Build and push (with cache)
         uses: docker/build-push-action@v6
         with:
