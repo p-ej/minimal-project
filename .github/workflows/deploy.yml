@@ -48,11 +48,9 @@ jobs:
     name: Build image, push to ECR, deploy to ECS
     runs-on: ubuntu-latest
     needs: ci                      # CI 통과 후에만 CD 진행
-
-    # OIDC 기반 AWS 인증을 위해 필요한 권한 설정
+    # Access Key 방식은 OIDC 권한이 필요 없습니다. (id-token 제거)
     permissions:
       contents: read
-      id-token: write
 
     env:
       AWS_REGION: ap-northeast-2              # 배포 리전
@@ -64,12 +62,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) AWS 자격증명 구성 (OIDC / IAM Role 필요). secrets.AWS_ROLE_ARN에 역할 ARN 저장 필요
+      # 2) AWS 자격증명 구성 (Access Key 방식). 레포 시크릿에 키 보관 필요
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       # 3) ECR 로그인 — docker/build-push-action이 ECR에 푸시할 수 있도록 레지스트리 로그인
       - name: Login to Amazon ECR
