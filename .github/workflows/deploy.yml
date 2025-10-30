@@ -1,0 +1,125 @@
+name: deploy
+
+# 이 워크플로는 메인 브랜치로의 변경 중, 배포에 영향 있는 파일 수정이 있을 때만 실행됩니다.
+# 또한 수동 실행(workflow_dispatch)도 지원합니다.
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/**'                 # 앱 소스 변경 시
+      - 'package.json'           # 의존성/스크립트 변경 시
+      - 'package-lock.json'      # 의존성 잠금 파일 변경 시
+      - 'Dockerfile'             # 도커 빌드 정의 변경 시
+      - 'ecs-task-def.json'      # ECS 태스크 정의 변경 시
+  workflow_dispatch:             # 수동 트리거
+
+# 동일 브랜치에서 중복 실행되는 배포 잡은 최신 실행만 유지하고 나머지는 취소합니다.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ----- CI 단계: 린트/테스트/빌드 체크 -----
+  ci:
+    name: Lint, Test and Build
+    runs-on: ubuntu-latest
+    steps:
+      # 1) 저장소 체크아웃
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2) Node 설정 (npm 캐시 활성화)
+      - name: Setup Node with cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3) 의존성 설치 (package-lock.json 기준 재현성 보장)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4) 린트 수행 — 자동 수정 불필요, 실패 시 워크플로 중단
+      - name: Lint
+        run: npm run lint -- --no-fix
+
+      # 5) 유닛 테스트 수행
+      - name: Test
+        run: npm test -- --ci --reporters=default --reporters=jest-junit
+
+      # 6) 타입체크/빌드 검증 — TS 컴파일 이상 여부 확인
+      - name: Build
+        run: npm run build
+
+  # ----- CD 단계: 컨테이너 빌드/푸시 및 ECS 배포 -----
+  build-and-deploy:
+    name: Build image, push to ECR, deploy to ECS
+    runs-on: ubuntu-latest
+    needs: ci                      # CI 통과 후에만 CD 진행
+
+    # OIDC 기반 AWS 인증을 위해 필요한 권한 설정
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ap-northeast-2              # 배포 리전
+      ECR_REPOSITORY: minimal-project         # ECR 리포지토리 이름 (사전 생성 필요)
+      IMAGE_TAG: ${{ github.sha }}            # 이미지 태그(커밋 SHA 사용)
+
+    steps:
+      # 1) 저장소 체크아웃 (도커 컨텍스트로 사용)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2) AWS 자격증명 구성 (OIDC / IAM Role 필요). secrets.AWS_ROLE_ARN에 역할 ARN 저장 필요
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      # 3) ECR 로그인 — docker/build-push-action이 ECR에 푸시할 수 있도록 레지스트리 로그인
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4) 이미지 URI 구성 — 이후 단계에서 참조하기 쉽도록 환경변수에 저장
+      - name: Set image uri
+        run: echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
+
+      # 5) 도커 이미지 빌드 및 푸시 — GHA 캐시를 사용해 레이어 캐시 적중률 향상, 배포 시간 단축
+      - name: Build and push (with cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_URI }}
+          provenance: false             # SBOM/attestation 비활성화(속도 우선). 필요 시 true
+          cache-from: type=gha          # GitHub Actions 캐시 사용 (레이어 복원)
+          cache-to: type=gha,mode=max   # 레이어 저장
+
+      # 6) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
+      - name: Render task definition
+        id: taskdef
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ecs-task-def.json        # 리포에 있는 베이스 태스크 정의
+          container-name: app                       # 교체 대상 컨테이너 이름 (태스크 정의와 일치)
+          image: ${{ env.IMAGE_URI }}               # 새로 빌드한 이미지
+
+      # 7) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.taskdef.outputs.task-definition }}
+          service: minimal-service                  # ECS 서비스명
+          cluster: minimal-cluster                  # ECS 클러스터명
+          wait-for-service-stability: true         # 안정화 대기 (배포 시간에 영향)
+
+      # (옵션) 8) 배포 결과/URL 출력 등 후처리 단계를 원하면 여기에 추가
+      # - name: Notify
+      #   run: |
+      #     echo "Deployed: $IMAGE_URI"
+
+

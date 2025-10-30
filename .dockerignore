@@ -1,4 +1,15 @@
 .git
-Dockerfile
+.gitignore
 node_modules
 dist
+coverage
+Dockerfile
+docker-compose.yml
+README.md
+docs
+**/*.md
+**/*.log
+.env
+.env.*
+.vscode
+.idea
