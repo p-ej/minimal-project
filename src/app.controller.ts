@@ -8,6 +8,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateTestDto } from './dtos/create-test.dto';
+import { paramStoreValues } from './config/env-loader.util';
 
 @ApiTags('default')
 @Controller()
@@ -43,11 +44,24 @@ export class AppController {
   @ApiOkResponse({ description: '환경 정보 반환' })
   @Get('/env')
   getEnv() {
+    // 민감정보 마스킹 규칙
+    const maskKeys = ['PASS', 'PASSWORD', 'SECRET', 'TOKEN', 'KEY'];
+    const maskedParamStore = Object.entries(paramStoreValues).reduce(
+      (acc, [k, v]) => {
+        const upper = k.toUpperCase();
+        const shouldMask = maskKeys.some((m) => upper.includes(m));
+        acc[k] = shouldMask ? '***' : v;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+
     return {
       nodeEnv: this.configService.get<string>('env.nodeEnv'),
       port: this.configService.get<number>('env.port'),
       awsRegion: this.configService.get<string>('aws.region'),
       paramStorePath: this.configService.get<string>('aws.paramStorePath'),
+      parameterStore: maskedParamStore,
     };
   }
 }
