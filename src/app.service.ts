@@ -22,5 +22,5 @@ export class AppService {
   getHealth(): string {
     return 'OK';
   }
-  
+
 }

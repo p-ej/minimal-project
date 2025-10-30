@@ -16,9 +16,12 @@ export async function loadEnvironmentVariables(): Promise<void> {
     dotenv.config();
   } else {
     // 운영 환경: AWS Parameter Store에서 로드
-    console.log(`🔧 Loading environment variables from AWS Parameter Store (NODE_ENV: ${nodeEnv})...`);
-    
-    const paramStorePath = process.env.PARAM_STORE_PATH || `/prod/${process.env.APP_NAME || 'minimal-project'}`;
+    console.log(
+      `🔧 Loading environment variables from AWS Parameter Store (NODE_ENV: ${nodeEnv})...`,
+    );
+
+    const paramStorePath =
+      process.env.PARAM_STORE_PATH || `/prod/${process.env.APP_NAME || 'minimal-project'}`;
     const awsRegion = process.env.AWS_REGION || 'ap-northeast-2';
 
     try {
@@ -40,11 +43,17 @@ export async function loadEnvironmentVariables(): Promise<void> {
         });
       }
 
-      console.log(`✅ Loaded ${parameters.length} parameters from AWS Parameter Store`);
+      console.log(
+        `✅ Loaded ${parameters.length} parameters from AWS Parameter Store`,
+      );
     } catch (error) {
-      console.error('❌ Failed to load parameters from AWS Parameter Store:', error);
-      throw new Error(`Failed to load environment variables from AWS Parameter Store: ${error.message}`);
+      console.error(
+        '❌ Failed to load parameters from AWS Parameter Store:',
+        error,
+      );
+      throw new Error(
+        `Failed to load environment variables from AWS Parameter Store: ${error.message}`,
+      );
     }
   }
 }
-

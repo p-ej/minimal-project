@@ -15,14 +15,20 @@ export default () => ({
     username: process.env.DB_USER,
     password: process.env.DB_PASS,
     database: process.env.DB_NAME,
-    synchronize: process.env.NODE_ENV === 'local' || process.env.NODE_ENV === 'development',
-    logging: process.env.NODE_ENV === 'local' || process.env.NODE_ENV === 'development',
+    synchronize:
+      process.env.NODE_ENV === 'local' ||
+      process.env.NODE_ENV === 'development',
+    logging:
+      process.env.NODE_ENV === 'local' ||
+      process.env.NODE_ENV === 'development',
   },
 
   // AWS Parameter Store 설정
   aws: {
     region: process.env.AWS_REGION || 'ap-northeast-2',
-    paramStorePath: process.env.PARAM_STORE_PATH || `/prod/${process.env.APP_NAME || 'minimal-project'}`,
+    paramStorePath:
+      process.env.PARAM_STORE_PATH ||
+      `/prod/${process.env.APP_NAME || 'minimal-project'}`,
   },
 });
 
