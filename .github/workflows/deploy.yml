@@ -56,6 +56,8 @@ jobs:
       AWS_REGION: ap-northeast-2              # 배포 리전
       ECR_REPOSITORY: minimal-project         # ECR 리포지토리 이름 (사전 생성 필요)
       IMAGE_TAG: ${{ github.sha }}            # 이미지 태그(커밋 SHA 사용)
+      ECS_CLUSTER: cluster-nestjs-second      # 이전 be-ci.yml 기준 실제 ECS 클러스터명
+      ECS_SERVICE: role-nestjs-second-service-d85kzfam  # 이전 be-ci.yml 기준 실제 ECS 서비스명
 
     steps:
       # 1) 저장소 체크아웃 (도커 컨텍스트로 사용)
@@ -111,8 +113,8 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.taskdef.outputs.task-definition }}
-          service: minimal-service                  # ECS 서비스명
-          cluster: minimal-cluster                  # ECS 클러스터명
+          service: ${{ env.ECS_SERVICE }}          # ECS 서비스명
+          cluster: ${{ env.ECS_CLUSTER }}          # ECS 클러스터명
           wait-for-service-stability: true         # 안정화 대기 (배포 시간에 영향)
 
       # (옵션) 8) 배포 결과/URL 출력 등 후처리 단계를 원하면 여기에 추가
