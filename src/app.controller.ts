@@ -56,12 +56,15 @@ export class AppController {
       {} as Record<string, string>,
     );
 
+    const nodeEnv = this.configService.get<string>('env.nodeEnv');
+    const isLocal = nodeEnv === 'local' || nodeEnv === 'development';
+
     return {
-      nodeEnv: this.configService.get<string>('env.nodeEnv'),
+      nodeEnv,
       port: this.configService.get<number>('env.port'),
       awsRegion: this.configService.get<string>('aws.region'),
       paramStorePath: this.configService.get<string>('aws.paramStorePath'),
-      parameterStore: maskedParamStore,
+      parameterStore: isLocal ? 'local' : maskedParamStore,
     };
   }
 }
