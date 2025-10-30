@@ -1,5 +1,10 @@
 import { plainToInstance } from 'class-transformer';
-import { IsNotEmpty, IsString, IsOptional, validateSync } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  validateSync,
+} from 'class-validator';
 
 /**
  * 환경변수 검증용 DTO
