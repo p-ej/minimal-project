@@ -57,7 +57,7 @@ jobs:
       ECR_REPOSITORY: minimal-project         # ECR 리포지토리 이름 (사전 생성 필요)
       IMAGE_TAG: ${{ github.sha }}            # 이미지 태그(커밋 SHA 사용)
       ECS_CLUSTER: cluster-nestjs-second      # 이전 be-ci.yml 기준 실제 ECS 클러스터명
-      ECS_SERVICE: role-nestjs-second-service  # 이전 be-ci.yml 기준 실제 ECS 서비스명
+      ECS_SERVICE: app  # 이전 be-ci.yml 기준 실제 ECS 서비스명
 
     steps:
       # 1) 저장소 체크아웃 (도커 컨텍스트로 사용)
