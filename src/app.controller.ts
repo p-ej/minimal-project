@@ -41,7 +41,7 @@ export class AppController {
   }
 
   @ApiOperation({ summary: '현재 실행 환경 조회' })
-  @ApiOkResponse({ description: '환경 정보 반환' })
+  @ApiOkResponse({ description: '환경 정보 반환(테스트용)' })
   @Get('/env')
   getEnv() {
     // 민감정보 마스킹 규칙
