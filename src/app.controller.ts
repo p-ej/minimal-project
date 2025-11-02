@@ -43,6 +43,7 @@ export class AppController {
   })
   @Post()
   async create(@Body() dto: CreateTestDto) {
+    console.log('Request POST /');
     return await this.appService.create(dto);
   }
 
