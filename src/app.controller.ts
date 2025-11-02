@@ -6,6 +6,12 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
+  ApiBadRequestResponse,
+  ApiInternalServerErrorResponse,
+  ApiServiceUnavailableResponse,
+  ApiUnauthorizedResponse,
+  ApiConflictResponse,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { CreateTestDto } from './dtos/create-test.dto';
 import { paramStoreValues } from './config/env-loader.util';
@@ -20,6 +26,21 @@ export class AppController {
 
   @ApiOperation({ summary: '테스트 생성' })
   @ApiCreatedResponse({ description: '생성됨' })
+  @ApiServiceUnavailableResponse({
+    description: '데이터베이스 연결 실패',
+  })
+  @ApiUnauthorizedResponse({
+    description: '데이터베이스 인증 실패',
+  })
+  @ApiNotFoundResponse({
+    description: '데이터베이스 또는 테이블을 찾을 수 없음',
+  })
+  @ApiConflictResponse({
+    description: '중복된 데이터 또는 제약 조건 위반',
+  })
+  @ApiInternalServerErrorResponse({
+    description: '데이터베이스 작업 중 오류 발생',
+  })
   @Post()
   async create(@Body() dto: CreateTestDto) {
     return await this.appService.create(dto);
@@ -27,6 +48,18 @@ export class AppController {
 
   @ApiOperation({ summary: '테스트 목록' })
   @ApiOkResponse({ description: '조회 성공' })
+  @ApiServiceUnavailableResponse({
+    description: '데이터베이스 연결 실패',
+  })
+  @ApiUnauthorizedResponse({
+    description: '데이터베이스 인증 실패',
+  })
+  @ApiNotFoundResponse({
+    description: '데이터베이스 또는 테이블을 찾을 수 없음',
+  })
+  @ApiInternalServerErrorResponse({
+    description: '데이터베이스 작업 중 오류 발생',
+  })
   @Get()
   async findAll() {
     return await this.appService.findAll();
