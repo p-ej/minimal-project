@@ -28,6 +28,11 @@ import { validate } from './config/env.validation';
         entities: [Test],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),
+        charset: 'utf8mb4',
+        extra: {
+          charset: 'utf8mb4',
+          connectionLimit: 10,
+        },
       }),
       inject: [ConfigService],
     }),
