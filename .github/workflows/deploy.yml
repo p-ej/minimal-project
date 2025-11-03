@@ -116,7 +116,6 @@ jobs:
           service: ${{ env.ECS_SERVICE }}          # ECS 서비스명
           cluster: ${{ env.ECS_CLUSTER }}          # ECS 클러스터명
           wait-for-service-stability: true
-          wait-for-minutes: 5         # 안정화 대기 (배포 시간에 영향)
 
       # (옵션) 8) 배포 결과/URL 출력 등 후처리 단계를 원하면 여기에 추가
       # - name: Notify

@@ -13,6 +13,8 @@ services:
       TZ: Asia/Seoul
     volumes:
       - db_data:/var/lib/mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"  # 호스트 포트:컨테이너 포트 (DBeaver 접속용)
     healthcheck:
       # 루트로 실제 쿼리 수행 (비밀번호 이스케이프 $$)
       test: ["CMD-SHELL", "mariadb -h 127.0.0.1 -uroot -p$${MARIADB_ROOT_PASSWORD} -e 'SELECT 1' || exit 1"]
