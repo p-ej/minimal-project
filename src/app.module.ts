@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test } from './test/test.entitiy';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { validate } from './config/env.validation';
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([Test]),
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
