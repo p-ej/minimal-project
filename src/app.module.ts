@@ -7,6 +7,7 @@ import { Test } from './test/test.entitiy';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { UsersModule } from './modules/users/users.module';
+import { BoardModule } from './modules/board/board.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { UsersModule } from './modules/users/users.module';
     }),
     TypeOrmModule.forFeature([Test]),
     UsersModule,
+    BoardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
