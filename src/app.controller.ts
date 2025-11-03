@@ -6,7 +6,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiTags,
-  ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
   ApiServiceUnavailableResponse,
   ApiUnauthorizedResponse,
