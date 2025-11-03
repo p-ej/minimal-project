@@ -220,12 +220,189 @@ VPC 엔드포인트를 설정하면:
 
 ## 트러블슈팅
 
-### 여전히 타임아웃이 발생한다면?
+### VPC 엔드포인트 생성 후에도 실패한다면?
 
-1. **엔드포인트 상태 확인**: 모든 엔드포인트가 `available` 상태인지
-2. **보안 그룹 확인**: ECR 엔드포인트와 태스크 간 통신 허용 여부
-3. **라우트 테이블 확인**: S3 엔드포인트가 올바른 라우트 테이블에 연결되었는지
-4. **태스크 서브넷 확인**: 엔드포인트가 태스크와 같은 서브넷/가용 영역에 있는지
+#### 1단계: 엔드포인트 상태 확인
+
+**AWS Console → VPC → Endpoints**
+
+모든 엔드포인트의 상태가 `available`인지 확인:
+- ❌ `pending` → 생성 중 (몇 분 대기)
+- ❌ `failed` → 생성 실패 (서브넷 IP 부족 등 원인 확인)
+- ✅ `available` → 정상
+
+**확인해야 할 엔드포인트 3개**:
+1. `com.amazonaws.ap-northeast-2.ecr.api`
+2. `com.amazonaws.ap-northeast-2.ecr.dkr`
+3. `com.amazonaws.ap-northeast-2.s3`
+
+#### 2단계: 보안 그룹 설정 확인 (가장 흔한 원인)
+
+**문제**: 엔드포인트와 태스크 간 통신이 보안 그룹에서 막혀있음
+
+**확인 방법**:
+
+1. **ECS 서비스의 보안 그룹 확인**:
+   - ECS → Services → 서비스 선택 → Networking 탭
+   - Security groups 확인 (예: `sg-xxxxx`)
+
+2. **VPC 엔드포인트의 보안 그룹 확인**:
+   - VPC → Endpoints → 각 엔드포인트 선택 → Security 탭
+   - Security groups 확인
+
+3. **보안 그룹 규칙 확인**:
+
+   **ECR 엔드포인트 보안 그룹**:
+   ```
+   인바운드 규칙:
+   - Type: HTTPS
+   - Protocol: TCP
+   - Port: 443
+   - Source: 태스크 보안 그룹 ID (sg-xxxxx) 또는 같은 보안 그룹
+   ```
+
+   **태스크 보안 그룹**:
+   ```
+   아웃바운드 규칙:
+   - Type: HTTPS
+   - Protocol: TCP
+   - Port: 443
+   - Destination: 엔드포인트 보안 그룹 ID 또는 0.0.0.0/0
+   ```
+
+**수정 방법**:
+
+**옵션 1: 같은 보안 그룹 사용 (간단)**
+- ECR 엔드포인트 생성 시 태스크와 **같은 보안 그룹** 선택
+- 자동으로 인바운드/아웃바운드 통신 허용
+
+**옵션 2: 보안 그룹 규칙 추가**
+- ECR 엔드포인트 보안 그룹의 인바운드 규칙에 태스크 보안 그룹 추가
+
+#### 3단계: 서브넷 및 가용 영역 확인
+
+**문제**: 엔드포인트가 태스크와 다른 가용 영역에 있음
+
+**확인 방법**:
+
+1. **ECS 태스크가 실행되는 서브넷 확인**:
+   - ECS → Tasks → 실행 중인 태스크 선택 → Details 탭
+   - Subnet ID 확인 (예: `subnet-xxxxx`)
+
+2. **엔드포인트가 연결된 서브넷 확인**:
+   - VPC → Endpoints → 각 엔드포인트 선택 → Subnets 탭
+   - 태스크 서브넷이 포함되어 있는지 확인
+
+**수정 방법**:
+- 엔드포인트가 태스크와 **모든 가용 영역**의 서브넷에 연결되어야 함
+- 태스크가 실행될 수 있는 모든 서브넷을 엔드포인트에 추가
+
+#### 4단계: Private DNS 확인
+
+**문제**: Private DNS가 비활성화되어 있어서 엔드포인트를 찾을 수 없음
+
+**확인 방법**:
+- VPC → Endpoints → 각 엔드포인트 선택 → Details 탭
+- "Private DNS enabled"가 `Yes`인지 확인
+
+**수정 방법**:
+- 엔드포인트 수정 (Modify) → "Enable Private DNS name" 체크
+- 또는 엔드포인트 재생성
+
+#### 5단계: 라우트 테이블 확인 (S3 엔드포인트만 해당)
+
+**S3 게이트웨이 엔드포인트**는 라우트 테이블에 경로를 추가합니다.
+
+**확인 방법**:
+1. VPC → Route Tables → 태스크 서브넷의 라우트 테이블 선택
+2. Routes 탭에서 `pl-xxxxx` (Prefix List) → `vpce-xxxxx` 경로가 있는지 확인
+
+**없다면**:
+- S3 엔드포인트 생성 시 라우트 테이블을 제대로 선택했는지 확인
+- 수동으로 추가 불가 (엔드포인트 생성 시 자동 추가)
+
+#### 6단계: 태스크 실행 역할 권한 확인
+
+**AWS Console에서 확인하는 방법**:
+
+1. **ECS 태스크 정의에서 역할 확인**:
+   - ECS → Task Definitions → `role-nestjs-second` 선택
+   - Execution role ARN 확인 (예: `arn:aws:iam::123456789012:role/role-nestjs`)
+   - 또는 `ecs-task-def.json` 파일에서 `executionRoleArn` 값 확인
+
+2. **IAM 역할로 이동**:
+   - IAM → Roles → 위에서 확인한 역할 이름 검색 (예: `role-nestjs`)
+   - 역할 선택
+
+3. **권한 정책 확인**:
+   - 권한(Permissions) 탭 클릭
+   - 연결된 정책 목록에서 다음 중 하나 확인:
+     - `AmazonECSTaskExecutionRolePolicy` (AWS 관리형 정책) ✅ 권장
+     - 또는 커스텀 정책에서 다음 권한이 있는지 확인:
+       - `ecr:GetAuthorizationToken`
+       - `ecr:BatchCheckLayerAvailability`
+       - `ecr:GetDownloadUrlForLayer`
+       - `ecr:BatchGetImage`
+
+4. **권한이 없다면 추가**:
+   - 권한(Permissions) 탭 → "권한 추가" 클릭
+   - "정책 연결" 선택
+   - 검색창에 `AmazonECSTaskExecutionRolePolicy` 입력
+   - 정책 선택 → "권한 추가" 클릭
+
+**AWS CLI로 확인하는 방법 (참고)**:
+```bash
+# AWS CLI
+aws iam get-role-policy --role-name ecs-task-execution-role --policy-name AmazonECSTaskExecutionRolePolicy
+```
+
+**필요한 권한**:
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "ecr:GetAuthorizationToken",
+    "ecr:BatchCheckLayerAvailability",
+    "ecr:GetDownloadUrlForLayer",
+    "ecr:BatchGetImage"
+  ],
+  "Resource": "*"
+}
+```
+
+#### 7단계: 실제 연결 테스트
+
+**ECS 태스크 내부에서 테스트** (디버깅용):
+
+1. **ECS → Tasks → 태스크 선택 → Connect**
+2. **ECS Exec 활성화**:
+   ```bash
+   # 태스크 내부에서 실행
+   curl -v https://906063354482.dkr.ecr.ap-northeast-2.amazonaws.com
+   ```
+
+**예상 결과**:
+- ✅ `200 OK` 또는 `401 Unauthorized` (인증 토큰 필요하지만 연결은 성공)
+- ❌ `timeout` 또는 `connection refused` → 네트워크 문제
+
+#### 8단계: CloudWatch 로그 확인
+
+**ECS → Services → 서비스 선택 → Logs 탭**
+
+에러 메시지의 IP 주소와 엔드포인트 IP가 일치하는지 확인:
+- ECR API 엔드포인트 IP와 에러의 IP 비교
+- DNS가 엔드포인트로 올바르게 리졸브되는지 확인
+
+## 빠른 체크리스트
+
+✅ 엔드포인트 3개 모두 `available` 상태
+✅ 엔드포인트가 태스크와 같은 서브넷에 연결됨
+✅ 보안 그룹에서 인바운드/아웃바운드 443 허용
+✅ Private DNS 활성화됨
+✅ 태스크 실행 역할에 ECR 권한 있음
+✅ S3 엔드포인트가 라우트 테이블에 추가됨
+
+**위 항목 중 하나라도 ❌이면 수정 필요!**
 
 ### 엔드포인트 생성 실패
 
