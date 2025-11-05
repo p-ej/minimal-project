@@ -30,5 +30,27 @@ export class Test2thController {
   getTest() {
     return this.test2thService.getTest();
   }
+
+  @ApiOperation({ summary: 'Test-2th 모듈 정보 조회' })
+  @ApiOkResponse({
+    description: '모듈 정보 반환',
+    schema: {
+      type: 'object',
+      properties: {
+        module: { type: 'string', example: 'test-2th' },
+        version: { type: 'string', example: '1.0.0' },
+        status: { type: 'string', example: 'active' },
+        timestamp: {
+          type: 'string',
+          format: 'date-time',
+          example: '2024-01-01T00:00:00.000Z',
+        },
+      },
+    },
+  })
+  @Get('info')
+  getInfo() {
+    return this.test2thService.getInfo();
+  }
 }
 
