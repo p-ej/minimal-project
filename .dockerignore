@@ -13,3 +13,9 @@ docs
 .env.*
 .vscode
 .idea
+test
+scripts
+*.tsbuildinfo
+.github
+docker-compose.*.yml
+redeploy.ps1
