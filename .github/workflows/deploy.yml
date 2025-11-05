@@ -98,17 +98,36 @@ jobs:
         run: echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
 
       # 6) 도커 이미지 빌드 및 푸시 — GHA 캐시를 사용해 레이어 캐시 적중률 향상, 배포 시간 단축
+      # ⚠️ 중요: :latest 태그를 사용하지 않고 특정 버전(커밋 SHA)만 사용하여 이미지 버전 안정성 보장
       - name: Build and push (with cache)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE_URI }}
+          tags: ${{ env.IMAGE_URI }}    # 특정 버전 태그만 사용 (커밋 SHA 기반)
           provenance: false             # SBOM/attestation 비활성화(속도 우선). 필요 시 true
           cache-from: type=gha          # GitHub Actions 캐시 사용 (레이어 복원)
           cache-to: type=gha,mode=max   # 레이어 저장 (최대 캐시 활용)
 
-      # 6) 이미지 URI를 출력 (다음 job에서 사용)
+      # 6-1) 이미지 푸시 확인 (이미지 버전 안정성 보장)
+      - name: Verify image exists in ECR
+        run: |
+          echo "🔍 Verifying image exists in ECR..."
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-ids imageTag=${{ env.IMAGE_TAG }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'imageDetails[0].{Digest:imageDigest,PushedAt:imagePushedAt}' \
+            --output json
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Error: Image ${{ env.IMAGE_URI }} not found in ECR"
+            exit 1
+          fi
+          
+          echo "✅ Image verified successfully in ECR"
+
+      # 6-2) 이미지 URI를 출력 (다음 job에서 사용)
       - name: Output image URI
         run: echo "IMAGE_URI=${{ env.IMAGE_URI }}" >> $GITHUB_OUTPUT
         id: image_output
@@ -148,16 +167,61 @@ jobs:
       - name: Set image uri
         run: echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
 
-      # 5) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
+      # 5) 이미지 존재 확인 (이미지 버전 안정성 보장)
+      - name: Verify image exists in ECR before deployment
+        run: |
+          echo "🔍 Verifying image exists in ECR before deployment..."
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-ids imageTag=${{ env.IMAGE_TAG }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'imageDetails[0].{Digest:imageDigest,PushedAt:imagePushedAt}' \
+            --output json
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Error: Image ${{ env.IMAGE_URI }} not found in ECR"
+            echo "   This can happen if the image was deleted or never pushed successfully."
+            exit 1
+          fi
+          
+          echo "✅ Image verified successfully in ECR"
+
+      # 6) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
+      # ⚠️ 중요: :latest 태그 대신 특정 버전(커밋 SHA)을 사용하여 이미지 버전 안정성 보장
       - name: Render task definition
         id: taskdef
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ecs-task-def.json
           container-name: app
-          image: ${{ env.IMAGE_URI }}
+          image: ${{ env.IMAGE_URI }}   # 특정 버전 태그 사용 (예: .../minimal-project:abc123def)
 
-      # 6) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
+      # 6-1) 렌더링된 태스크 정의 확인 (디버깅용) - :latest 태그 사용 여부 확인
+      - name: Verify task definition (check for :latest tag)
+        run: |
+          echo "🔍 Verifying rendered task definition..."
+          IMAGE_URI=$(echo "${{ steps.taskdef.outputs.task-definition }}" | jq -r '.containerDefinitions[0].image')
+          echo "Image URI: $IMAGE_URI"
+          
+          # :latest 태그 사용 여부 확인
+          if echo "$IMAGE_URI" | grep -q ":latest"; then
+            echo "❌ Error: Task definition uses :latest tag. This violates AWS ECS image version stability requirements."
+            echo "   Please use a specific version tag instead."
+            exit 1
+          fi
+          
+          # 특정 버전 태그 확인
+          if echo "$IMAGE_URI" | grep -qE ":[a-f0-9]{40}$"; then
+            echo "✅ Task definition uses specific version tag (commit SHA)"
+          elif echo "$IMAGE_URI" | grep -qE ":[0-9]+\.[0-9]+\.[0-9]+"; then
+            echo "✅ Task definition uses specific version tag (semantic version)"
+          else
+            echo "⚠️ Warning: Tag format is not standard. Please verify the tag is a specific version."
+          fi
+          
+          echo "✅ Task definition verification passed"
+
+      # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
       - name: Update ECS service network configuration (enable public IP)
         run: |
           # 현재 서비스의 네트워크 구성 가져오기
@@ -203,7 +267,33 @@ jobs:
             echo "⚠️ Could not retrieve subnet configuration. Please update service manually in AWS Console."
           fi
 
-      # 7) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
+      # 8) 기존 태스크 확인 및 정리 (ENI 오류 방지)
+      - name: Check and cleanup stale tasks
+        run: |
+          echo "🔍 Checking for stale tasks..."
+          
+          # 실행 중이거나 중지된 태스크 확인
+          STALE_TASKS=$(aws ecs list-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service-name ${{ env.ECS_SERVICE }} \
+            --desired-status STOPPED \
+            --region ${{ env.AWS_REGION }} \
+            --query 'taskArns' \
+            --output json 2>/dev/null || echo "[]")
+          
+          echo "Found stale tasks: $STALE_TASKS"
+          
+          # 서비스 강제 새 배포 (기존 태스크 정리)
+          echo "🔄 Forcing new deployment to cleanup stale tasks..."
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }} \
+            --query 'service.{ServiceName:serviceName,Status:status}' \
+            --output json || echo "⚠️ Warning: Could not force new deployment"
+
+      # 9) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
@@ -211,6 +301,7 @@ jobs:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+          force-new-deployment: true  # 강제 새 배포 (ENI 오류 방지)
 
       # (옵션) 배포 결과 출력
       - name: Deployment summary

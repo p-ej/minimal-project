@@ -8,5 +8,19 @@ export class Test2thService {
       timestamp: new Date().toISOString(),
     };
   }
+
+  getInfo(): {
+    module: string;
+    version: string;
+    status: string;
+    timestamp: string;
+  } {
+    return {
+      module: 'test-2th',
+      version: '1.0.0',
+      status: 'active',
+      timestamp: new Date().toISOString(),
+    };
+  }
 }
 
