@@ -19,29 +19,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ----- CI 단계: 린트/테스트/빌드 체크 -----
+  # ----- CI 단계: 타입 체크만 수행 (빌드는 Docker에서만) -----
   ci:
-    name: Build only
+    name: Type check only
     runs-on: ubuntu-latest
     steps:
       # 1) 저장소 체크아웃
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2) Node 설정 (npm 캐시 활성화)
-      - name: Setup Node with cache
+      # 2) Node 설정
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+
+      # 2-1) npm 캐시 명시적 설정 (setup-node의 cache보다 더 세밀한 제어 가능)
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       # 3) 의존성 설치 (package-lock.json 기준 재현성 보장)
       - name: Install dependencies
         run: npm ci
 
-      # 4) 타입체크/빌드 검증 — TS 컴파일 이상 여부 확인
-      - name: Build
-        run: npm run build
+      # 4) 타입 체크만 수행 (빌드는 Docker에서 한 번만 수행)
+      - name: Type check
+        run: npx tsc --noEmit
 
   # ----- CD 단계: 컨테이너 빌드/푸시 및 ECS 배포 -----
   build-and-deploy:
@@ -97,7 +105,7 @@ jobs:
           tags: ${{ env.IMAGE_URI }}
           provenance: false             # SBOM/attestation 비활성화(속도 우선). 필요 시 true
           cache-from: type=gha          # GitHub Actions 캐시 사용 (레이어 복원)
-          cache-to: type=gha,mode=max   # 레이어 저장
+          cache-to: type=gha,mode=max   # 레이어 저장 (최대 캐시 활용)
 
       # 6) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
       - name: Render task definition
@@ -108,8 +116,8 @@ jobs:
           container-name: app                       # 교체 대상 컨테이너 이름 (태스크 정의와 일치)
           image: ${{ env.IMAGE_URI }}               # 새로 빌드한 이미지
 
-      # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 비활성화)
-      - name: Update ECS service network configuration (disable public IP)
+      # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
+      - name: Update ECS service network configuration (enable public IP)
         run: |
           # 현재 서비스의 네트워크 구성 가져오기
           SUBNETS=$(aws ecs describe-services \
@@ -137,7 +145,7 @@ jobs:
               aws ecs update-service \
                 --cluster ${{ env.ECS_CLUSTER }} \
                 --service ${{ env.ECS_SERVICE }} \
-                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_IDS],assignPublicIp=DISABLED}" \
+                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_IDS],assignPublicIp=ENABLED}" \
                 --region ${{ env.AWS_REGION }} \
                 --query 'service.networkConfiguration' \
                 --output json || echo "⚠️ Network configuration update failed or already correct"
@@ -145,7 +153,7 @@ jobs:
               aws ecs update-service \
                 --cluster ${{ env.ECS_CLUSTER }} \
                 --service ${{ env.ECS_SERVICE }} \
-                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],assignPublicIp=DISABLED}" \
+                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],assignPublicIp=ENABLED}" \
                 --region ${{ env.AWS_REGION }} \
                 --query 'service.networkConfiguration' \
                 --output json || echo "⚠️ Network configuration update failed or already correct"
