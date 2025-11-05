@@ -108,7 +108,53 @@ jobs:
           container-name: app                       # 교체 대상 컨테이너 이름 (태스크 정의와 일치)
           image: ${{ env.IMAGE_URI }}               # 새로 빌드한 이미지
 
-      # 7) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
+      # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 비활성화)
+      - name: Update ECS service network configuration (disable public IP)
+        run: |
+          # 현재 서비스의 네트워크 구성 가져오기
+          SUBNETS=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' \
+            --output text)
+          
+          SECURITY_GROUPS=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_SERVICE }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups' \
+            --output text)
+          
+          # 서브넷과 보안 그룹이 있으면 네트워크 구성 업데이트
+          if [ ! -z "$SUBNETS" ] && [ "$SUBNETS" != "None" ]; then
+            # 서브넷을 쉼표로 구분된 문자열로 변환
+            SUBNET_IDS=$(echo $SUBNETS | tr '\t' ' ' | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' ',')
+            
+            # 보안 그룹이 있으면 포함, 없으면 제외
+            if [ ! -z "$SECURITY_GROUPS" ] && [ "$SECURITY_GROUPS" != "None" ]; then
+              SG_IDS=$(echo $SECURITY_GROUPS | tr '\t' ' ' | tr -s ' ' | sed 's/^ *//;s/ *$//' | tr ' ' ',')
+              aws ecs update-service \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --service ${{ env.ECS_SERVICE }} \
+                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SG_IDS],assignPublicIp=DISABLED}" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'service.networkConfiguration' \
+                --output json || echo "⚠️ Network configuration update failed or already correct"
+            else
+              aws ecs update-service \
+                --cluster ${{ env.ECS_CLUSTER }} \
+                --service ${{ env.ECS_SERVICE }} \
+                --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],assignPublicIp=DISABLED}" \
+                --region ${{ env.AWS_REGION }} \
+                --query 'service.networkConfiguration' \
+                --output json || echo "⚠️ Network configuration update failed or already correct"
+            fi
+          else
+            echo "⚠️ Could not retrieve subnet configuration. Please update service manually in AWS Console."
+          fi
+
+      # 8) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
