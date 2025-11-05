@@ -52,10 +52,11 @@ jobs:
         run: npx tsc --noEmit
 
   # ----- CD 단계: 컨테이너 빌드/푸시 및 ECS 배포 -----
-  build-and-deploy:
-    name: Build image, push to ECR, deploy to ECS
+  # ⚠️ 순서 제어: ci → build-docker → deploy-ecs 순서로 실행됨
+  build-docker:
+    name: Build Docker image and push to ECR
     runs-on: ubuntu-latest
-    needs: ci                      # CI 통과 후에만 CD 진행
+    needs: ci                      # CI 통과 후에만 빌드 진행
     # Access Key 방식은 OIDC 권한이 필요 없습니다. (id-token 제거)
     # permissions:
       # contents: read
@@ -107,16 +108,56 @@ jobs:
           cache-from: type=gha          # GitHub Actions 캐시 사용 (레이어 복원)
           cache-to: type=gha,mode=max   # 레이어 저장 (최대 캐시 활용)
 
-      # 6) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
+      # 6) 이미지 URI를 출력 (다음 job에서 사용)
+      - name: Output image URI
+        run: echo "IMAGE_URI=${{ env.IMAGE_URI }}" >> $GITHUB_OUTPUT
+        id: image_output
+
+  # ----- 배포 단계: ECS에 배포 (빌드 완료 후 실행) -----
+  deploy-ecs:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: build-docker            # Docker 빌드 완료 후에만 배포 진행
+
+    env:
+      AWS_REGION: ap-northeast-2
+      ECR_REPOSITORY: minimal-project
+      IMAGE_TAG: ${{ github.sha }}
+      ECS_CLUSTER: cluster-nestjs-second
+      ECS_SERVICE: app
+
+    steps:
+      # 1) 저장소 체크아웃 (태스크 정의 파일 필요)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2) AWS 자격증명 구성
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # 3) ECR 로그인 (이미지 URI 확인용)
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4) 이미지 URI 구성 (빌드된 이미지 사용)
+      - name: Set image uri
+        run: echo "IMAGE_URI=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
+
+      # 5) 태스크 정의 렌더링 — 컨테이너 이미지만 교체된 새로운 태스크 정의 생성
       - name: Render task definition
         id: taskdef
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ecs-task-def.json        # 리포에 있는 베이스 태스크 정의
-          container-name: app                       # 교체 대상 컨테이너 이름 (태스크 정의와 일치)
-          image: ${{ env.IMAGE_URI }}               # 새로 빌드한 이미지
+          task-definition: ecs-task-def.json
+          container-name: app
+          image: ${{ env.IMAGE_URI }}
 
-      # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
+      # 6) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
       - name: Update ECS service network configuration (enable public IP)
         run: |
           # 현재 서비스의 네트워크 구성 가져오기
@@ -162,18 +203,21 @@ jobs:
             echo "⚠️ Could not retrieve subnet configuration. Please update service manually in AWS Console."
           fi
 
-      # 8) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
+      # 7) ECS 배포 — 새 태스크 정의를 서비스에 적용하고 안정화까지 대기
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.taskdef.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}          # ECS 서비스명
-          cluster: ${{ env.ECS_CLUSTER }}          # ECS 클러스터명
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
 
-      # (옵션) 8) 배포 결과/URL 출력 등 후처리 단계를 원하면 여기에 추가
-      # - name: Notify
-      #   run: |
-      #     echo "Deployed: $IMAGE_URI"
+      # (옵션) 배포 결과 출력
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment completed successfully"
+          echo "Image: ${{ env.IMAGE_URI }}"
+          echo "Service: ${{ env.ECS_SERVICE }}"
+          echo "Cluster: ${{ env.ECS_CLUSTER }}"
 
 
