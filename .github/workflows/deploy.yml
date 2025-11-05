@@ -1,6 +1,7 @@
 name: deploy
 
-# 이 워크플로는 메인 브랜치로의 변경 중, 배포에 영향 있는 파일 수정이 있을 때만 실행됩니다.
+# 이 워크플로는 메인 브랜치로의 변경 중, 배포에 영향 있는 파일 수정이 있을 때 실행됩니다.
+# 트리거 조건: src 코드, package.json, Dockerfile, ecs-task-def.json, 워크플로우 파일 변경
 # 또한 수동 실행(workflow_dispatch)도 지원합니다.
 on:
   push:
@@ -11,6 +12,7 @@ on:
       - 'package-lock.json'      # 의존성 잠금 파일 변경 시
       - 'Dockerfile'             # 도커 빌드 정의 변경 시
       - 'ecs-task-def.json'      # ECS 태스크 정의 변경 시
+      - '.github/workflows/**'   # 워크플로우 파일 변경 시 (CI/CD 구성 변경)
   workflow_dispatch:             # 수동 트리거
 
 # 동일 브랜치에서 중복 실행되는 배포 잡은 최신 실행만 유지하고 나머지는 취소합니다.
@@ -196,30 +198,39 @@ jobs:
           container-name: app
           image: ${{ env.IMAGE_URI }}   # 특정 버전 태그 사용 (예: .../minimal-project:abc123def)
 
-      # 6-1) 렌더링된 태스크 정의 확인 (디버깅용) - :latest 태그 사용 여부 확인
-      - name: Verify task definition (check for :latest tag)
+      # 6-1) 이미지 URI 검증 - :latest 태그 사용 여부 확인
+      - name: Verify image URI (check for :latest tag)
         run: |
-          echo "🔍 Verifying rendered task definition..."
-          IMAGE_URI=$(echo "${{ steps.taskdef.outputs.task-definition }}" | jq -r '.containerDefinitions[0].image')
+          echo "🔍 Verifying image URI..."
+          IMAGE_URI="${{ env.IMAGE_URI }}"
+          
+          if [ -z "$IMAGE_URI" ]; then
+            echo "⚠️ Warning: IMAGE_URI environment variable is not set"
+            exit 0
+          fi
+          
           echo "Image URI: $IMAGE_URI"
           
           # :latest 태그 사용 여부 확인
           if echo "$IMAGE_URI" | grep -q ":latest"; then
-            echo "❌ Error: Task definition uses :latest tag. This violates AWS ECS image version stability requirements."
+            echo "❌ Error: Image URI uses :latest tag. This violates AWS ECS image version stability requirements."
             echo "   Please use a specific version tag instead."
             exit 1
           fi
           
           # 특정 버전 태그 확인
           if echo "$IMAGE_URI" | grep -qE ":[a-f0-9]{40}$"; then
-            echo "✅ Task definition uses specific version tag (commit SHA)"
+            echo "✅ Image URI uses specific version tag (commit SHA - 40 chars)"
+          elif echo "$IMAGE_URI" | grep -qE ":[a-f0-9]{7,}$"; then
+            echo "✅ Image URI uses specific version tag (commit SHA - short)"
           elif echo "$IMAGE_URI" | grep -qE ":[0-9]+\.[0-9]+\.[0-9]+"; then
-            echo "✅ Task definition uses specific version tag (semantic version)"
+            echo "✅ Image URI uses specific version tag (semantic version)"
           else
             echo "⚠️ Warning: Tag format is not standard. Please verify the tag is a specific version."
+            echo "   Current image URI: $IMAGE_URI"
           fi
           
-          echo "✅ Task definition verification passed"
+          echo "✅ Image URI verification passed"
 
       # 7) ECS 서비스 네트워크 구성 업데이트 (퍼블릭 IP 활성화)
       - name: Update ECS service network configuration (enable public IP)
