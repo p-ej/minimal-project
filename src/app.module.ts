@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { validate } from './config/env.validation';
       }),
       inject: [ConfigService],
     }),
+    HealthModule,
   ],
   controllers: [],
   providers: [],

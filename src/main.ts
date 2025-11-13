@@ -28,6 +28,12 @@ async function bootstrap() {
     swaggerOptions: { persistAuthorization: true },
   });
 
+  // Lightweight health check without dedicated controller
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  httpAdapter.get('/', (_req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   const port = configService.get<number>('env.port') || 3000;
   await app.listen(port, '0.0.0.0');
   console.log(`Application is running on: http://0.0.0.0:${port}`);

@@ -40,6 +40,22 @@
 - **운영 환경**: AWS Systems Manager Parameter Store에서 SecureString으로 관리, ECS Task Role이 파라미터를 로드
 - 공통 설정은 `@nestjs/config` + 커스텀 `env-loader` 유틸리티가 주입
 
+## 변경 이력
+
+### 2025-11-13
+- 기본 `AppController`, `AppService`, `Test` 엔티티, `Users` 모듈 제거로 API 초기화
+- `/` 루트 경로에 경량 헬스 체크 200 응답 추가
+- `@nestjs/terminus` 기반 `HealthModule`/`HealthController` 도입, `/health` 엔드포인트에서 DB ping 확인
+- README 구조 전면 재정리 및 Docker Compose 가이드 업데이트
+- 헬스 체크 모듈을 모놀리식 구조에 맞춰 `modules/health`로 재배치
+
+### 2025-10-28
+- NestJS 애플리케이션 최초 구성
+- Docker, AWS ECR/ECS, GitHub Actions(CI/CD) 파이프라인 설정
+- ALB 미사용으로 ECS 태스크 IP 변경 이슈, EC2 프록시 + Route 53 + 도메인 연결로 대응
+- 운영 DB: AWS RDS, 환경 변수는 Parameter Store/`.env`로 분리 관리
+- 운영 환경은 Docker 이미지(ECS Fargate) 기반으로 배포
+
 ## 로컬 개발 가이드
 
 ### Docker Compose 주요 명령
