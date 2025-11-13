@@ -9,16 +9,18 @@ sequenceDiagram
     participant Server as Minimal API Server
     participant OpenAPI as 외부 문장 추천 Open API
 
-    Client->>Server: 1. GET /api/v1/sentences/today
+    Client->>Server: 1. GET /api/sentences/today (Accept-Version: 1)
     Server->>OpenAPI: 2. 외부 Open API 호출 (문장·메타데이터 요청)
     OpenAPI-->>Server: 3. 문장/난이도/출처 응답
-    Server->>Server: 4. 캐싱/포맷팅/검증 처리
-    Server-->>Client: 5. 오늘의 문장 응답 (JSON)
+    Server->>DB: 4. 문장 기록 저장/업데이트
+    Server->>Server: 5. 캐싱/포맷팅/검증 처리
+    Server-->>Client: 6. 오늘의 문장 응답 (JSON)
 ```
 
 ### 요청/응답 초안
 - **HTTP Method**: `GET`
-- **Endpoint**: `/api/v1/sentences/today`
+- **Endpoint**: `/api/sentences/today`
+- **Version Header**: `Accept-Version: 1`
 - **Query Params**: `locale`, `level` 등 선택 옵션 (선택)
 - **Success Response (200)**:
   ```json

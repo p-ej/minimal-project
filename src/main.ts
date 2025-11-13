@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { loadEnvironmentVariables } from './config/env-loader.util';
 import { ConfigService } from '@nestjs/config';
 
@@ -11,6 +11,15 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // Global prefix & header versioning
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'health', method: RequestMethod.ALL }],
+  });
+  app.enableVersioning({
+    type: VersioningType.HEADER,
+    header: 'Accept-Version',
+  });
 
   // DTO 유효성 검증(권장)
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));

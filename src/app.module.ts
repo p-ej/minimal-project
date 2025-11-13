@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { HealthModule } from './modules/health/health.module';
+import { SentencesModule } from './modules/sentences/sentences.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { HealthModule } from './modules/health/health.module';
       inject: [ConfigService],
     }),
     HealthModule,
+    SentencesModule,
   ],
   controllers: [],
   providers: [],

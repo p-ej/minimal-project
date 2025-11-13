@@ -48,6 +48,9 @@
 - `@nestjs/terminus` 기반 `HealthModule`/`HealthController` 도입, `/health` 엔드포인트에서 DB ping 확인
 - README 구조 전면 재정리 및 Docker Compose 가이드 업데이트
 - 헬스 체크 모듈을 모놀리식 구조에 맞춰 `modules/health`로 재배치
+- `SentencesModule` 초기 구성 (`GET /api/sentences/today` 스켈레톤)
+- Swagger 초기가이드 적용 (`SentencesController` API 문서화, 응답 DTO 정의)
+- 전역 API Prefix(`api`) 및 헤더 버전 관리(`Accept-Version`) 설정
 
 ### 2025-10-28
 - NestJS 애플리케이션 최초 구성
