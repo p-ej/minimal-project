@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { Test } from './test/test.entitiy';
 import configuration from './config/configuration';
 import { validate } from './config/env.validation';
-import { UsersModule } from './modules/users/users.module';
+import { HealthModule } from './modules/health/health.module';
+import { SentencesModule } from './modules/sentences/sentences.module';
 
 @Module({
   imports: [
@@ -26,7 +24,7 @@ import { UsersModule } from './modules/users/users.module';
         username: configService.get<string>('database.username'),
         password: configService.get<string>('database.password'),
         database: configService.get<string>('database.database'),
-        entities: [Test],
+        entities: [],
         synchronize: configService.get<boolean>('database.synchronize'),
         logging: configService.get<boolean>('database.logging'),
         charset: 'utf8mb4',
@@ -37,10 +35,10 @@ import { UsersModule } from './modules/users/users.module';
       }),
       inject: [ConfigService],
     }),
-    TypeOrmModule.forFeature([Test]),
-    UsersModule,
+    HealthModule,
+    SentencesModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}
